@@ -1,5 +1,6 @@
 import asyncHandler from "express-async-handler";
 import User from "../models/userModel.js";
+import generateToken from "../utils/generateToken.js";
 
 //register user controller
 const registerUser = asyncHandler(async (req, res) => { 
@@ -40,23 +41,23 @@ const registerUser = asyncHandler(async (req, res) => {
 // login user
 
 const loginUser = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password } = await req.body;
+    const user = await User.findOne({ email });
 
-    // Check for user email
-    const user = await User.findOne({ email });         
     if (user && (await user.matchPassword(password))) {
-        res.json({
+        res.status(200).json({
             _id: user._id,
             name: user.name,
             email: user.email,
             avatar: user.avatar,
             role: user.role,
             addresses: user.addresses,
+            token:generateToken(user._id),
         });
     } else {
         res.status(401);
         throw new Error("Invalid email or password");
-    }
-});
+    }  
+    });
 
-export { registerUser };
+export { registerUser, loginUser };
