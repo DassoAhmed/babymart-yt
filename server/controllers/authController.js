@@ -60,4 +60,31 @@ const loginUser = asyncHandler(async (req, res) => {
     }  
     });
 
-export { registerUser, loginUser };
+    //getUserProfile
+    const getUserProfile = asyncHandler(async (req, res) => {
+        const user = await User.findById(req.user._id);
+        if (user) {
+            res.status(200).json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                avatar: user.avatar,
+                role: user.role,
+                addresses: user.addresses || [],
+            });
+        } else {
+            console.log("User not found with ID:", req.user._id);
+            res.status(404);
+            throw new Error("User not found"
+            );
+        }
+    });
+
+    //logout user
+    const logoutUser = asyncHandler(async (req, res) => {
+        res.status(200).json({ 
+            success: true,
+            message: "Logging out user" 
+        });
+    });
+export { registerUser, loginUser, getUserProfile, logoutUser };
