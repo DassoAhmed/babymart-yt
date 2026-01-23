@@ -6,15 +6,15 @@ const router = express.Router();
 
 //route
 router
-.route("/")
-.get(protect, admin, getUsers)
-.post(protect, admin, createUser);
+  .route("/")
+  .get(protect, admin, getUsers)
+  .post(protect, admin, createUser);
  
 // /:id route to get user by id (admin only)
 router
 .route("/:id")
-.get(protect, getUsersById)
-.put(protect, updateUser);
+.get(protect, admin, getUsersById)
+.put(protect, admin, updateUser);
 // .delete(protect, admin, deleteUserById);
 
 // /:id/addresses route to add address to user (protected)

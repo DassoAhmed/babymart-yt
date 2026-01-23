@@ -48,8 +48,9 @@ const createUser = asyncHandler(async (req, res) => {
 //get user by id controller (if needed in future)
 const getUsersById = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id).select('-password');
+
     if (user) {
-        res.status(200).json(user);
+        res.json(user);
     } else {
         res.status(404);
         throw new Error("User not found");
@@ -58,30 +59,22 @@ const getUsersById = asyncHandler(async (req, res) => {
  //update user by id controller (if needed in future)
  const updateUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
-    if (user) {
-        user.name = req.body.name || user.name;
-        user.email = req.body.email || user.email;
-        user.role = req.body.role || user.role;
-        const updatedUser = await user.save();
-        res.status(200).json({
-            _id: updatedUser._id,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            role: updatedUser.role,
-        });
-    } else {
+
+    if (!user) {
         res.status(404);
         throw new Error("User not found");
     }
+    
     //allow updates by user themselves or admin only
      user.name = req.body.name || user.name;
      if(req.body.password){
         user.password = req.body.password;
      }
-     if(req.bode.role) {
+     if(req.body.role) {
         user.role = req.body.role;
      }
      user.addresses = req.body.addresses || user.addresses;
+    
 
      //avatar update can be handled here if needed
      const updatedUser = await user.save();
