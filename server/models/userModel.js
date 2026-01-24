@@ -48,11 +48,34 @@ const userSchema = mongoose.Schema({
     },
 ],
     //whishlist
+    whishlist:[
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+            
+        },
+    ],
     //cart
+    cart:[
+        {
+            product: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Product",
+                required: true,
+            },
+            quantity: {
+                type: Number,
+                required: true,
+                min: 1,
+            },
+        }
+    ],
     //oder
-},{ 
+},
+{ 
     timestamps: true,
-}); 
+ }
+); 
 
 //match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function (enteredPassword) {   

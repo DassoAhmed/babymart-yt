@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect , admin } from '../middleware/authMiddleware.js';
-import { createUser, getUsers, getUsersById, updateUser,} from '../controllers/userController.js';
+import { addAddress, createUser, deleteAddress, deleteUser, getUsers, getUsersById, updateAddress, updateUser,} from '../controllers/userController.js';
 
 const router = express.Router();
 
@@ -14,12 +14,17 @@ router
 router
 .route("/:id")
 .get(protect, admin, getUsersById)
-.put(protect, admin, updateUser);
-// .delete(protect, admin, deleteUserById);
+.put(protect, admin, updateUser)
+.delete(protect, admin, deleteUser);
 
-// /:id/addresses route to add address to user (protected)
 
-// /:id/addresses/:addressId route to delete address from user (protected)
+router.route("/:id/addresses").post(protect, addAddress);
+
+
+router
+.route("/:id/addresses/:addressId")
+.put(protect, updateAddress)
+.delete(protect, deleteAddress);
 
 
 export default router;
