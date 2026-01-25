@@ -76,6 +76,7 @@ const updateUser = asyncHandler(async (req, res) => {
 
     //avatar update can be handled here if needed
     const updatedUser = await user.save();
+    
     res.status(200).json({
         _id: updatedUser._id,
         name: updatedUser.name,
@@ -251,6 +252,6 @@ const deleteAddress = asyncHandler(async (req, res) => {
         addresses: user.addresses,
         message: "Address deleted successfully",
     });
-});f
+});
 
 export { getUsers, createUser, getUsersById, updateUser, deleteUser, addAddress, updateAddress, deleteAddress };

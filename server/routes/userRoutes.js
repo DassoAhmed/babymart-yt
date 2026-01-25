@@ -19,7 +19,7 @@ router
 
 
 router.route("/:id/addresses").post(protect, addAddress);
-
+router;
 
 router
 .route("/:id/addresses/:addressId")

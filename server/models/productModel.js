@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import Category from "./categoryModel";
 
 const productSchema = mongoose.Schema(
     {
@@ -54,7 +53,7 @@ const productSchema = mongoose.Schema(
         images: 
             {
                 type: String,
-                required: true,
+                // required: true,
             },
         Category: {
             type: mongoose.Schema.Types.ObjectId,
