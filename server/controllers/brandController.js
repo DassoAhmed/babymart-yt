@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import Brand from "../models/brandModel.js";
+import Brand from "../models/BrandModel.js";
 import cloudinary from "../config/cloudinary.js"; // Make sure to import cloudinary
 
 // @desc    Get all brands

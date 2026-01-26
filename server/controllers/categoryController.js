@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import Category from "../models/categoryModel.js";
+import Category from "../models/CategoryModel.js";
 import cloudinary from "../config/cloudinary.js";
 
 // @desc    Get all categories
