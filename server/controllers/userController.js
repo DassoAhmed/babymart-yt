@@ -1,35 +1,47 @@
 import asyncHandler from "express-async-handler";
 import User from "../models/userModel.js";
 
-// getUsers controller
+// @desc    Get all users (Admin only)
+// @route   GET /api/users
+// @access  Private/Admin
 const getUsers = asyncHandler(async (req, res) => {
     const users = await User.find({}).select('-password');
     res.status(200).json({
         success: true,
+        count: users.length,
         users,
     });
 });
 
-//create user controller (if needed in future)
+// @desc    Create a new user (Admin only)
+// @route   POST /api/users
+// @access  Private/Admin
 const createUser = asyncHandler(async (req, res) => {
     const { name, email, password, role } = req.body;
+    
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
         res.status(400);
         throw new Error("User already exists");
     }
+    
+    // Validate required fields
+    if (!name || !email || !password) {
+        res.status(400);
+        throw new Error("Please fill all required fields: name, email, password");
+    }
+
     // Create user
     const user = await User.create({
         name,
         email,
         password,
-        role,
+        role: role || 'customer',
         addresses: [],
     });
 
     if (user) {
-        //Initial empty cart
         res.status(201).json({
             _id: user._id,
             name: user.name,
@@ -44,19 +56,32 @@ const createUser = asyncHandler(async (req, res) => {
     }
 });
 
-//get user by id controller (if needed in future)
+// @desc    Get user by ID (Admin or user themselves)
+// @route   GET /api/users/:id
+// @access  Private
 const getUsersById = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id).select('-password');
 
     if (user) {
-        res.json(user);
+        // Check if user is requesting their own data or is admin
+        if (req.user._id.toString() === user._id.toString() || req.user.role === 'admin') {
+            res.json({
+                success: true,
+                user
+            });
+        } else {
+            res.status(403);
+            throw new Error('Not authorized to view this user');
+        }
     } else {
         res.status(404);
         throw new Error("User not found");
     }
 });
 
-//update user by id controller (if needed in future)
+// @desc    Update user (Admin or user themselves)
+// @route   PUT /api/users/:id
+// @access  Private
 const updateUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
 
@@ -64,17 +89,32 @@ const updateUser = asyncHandler(async (req, res) => {
         res.status(404);
         throw new Error("User not found");
     }
-    //allow updates by user themselves or admin only
+    
+    // Check authorization: user can update themselves, admin can update anyone
+    if (req.user._id.toString() !== user._id.toString() && req.user.role !== 'admin') {
+        res.status(403);
+        throw new Error('Not authorized to update this user');
+    }
+
+    // Update fields
     user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    
+    // Only admin can change role
+    if (req.body.role && req.user.role === 'admin') {
+        user.role = req.body.role;
+    }
+    
+    // Update password if provided
     if (req.body.password) {
         user.password = req.body.password;
     }
-    if (req.body.role) {
-        user.role = req.body.role;
+    
+    // Update addresses if provided
+    if (req.body.addresses) {
+        user.addresses = req.body.addresses;
     }
-    user.addresses = req.body.addresses || user.addresses;
 
-    //avatar update can be handled here if needed
     const updatedUser = await user.save();
     
     res.status(200).json({
@@ -87,16 +127,22 @@ const updateUser = asyncHandler(async (req, res) => {
     });
 });
 
-//delete user by id controller (if needed in future)
+// @desc    Delete user (Admin only)
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
 const deleteUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
+    
     if (user) {
-        // Delete user's cart 
-        // Delete user's orders (if any exists)
-        //Delete the user
+        // Check if admin is trying to delete themselves
+        if (req.user._id.toString() === user._id.toString()) {
+            res.status(400);
+            throw new Error('Admins cannot delete themselves');
+        }
+        
         await user.deleteOne();
         res.status(200).json({
-            status: "success",
+            success: true,
             message: "User deleted successfully",
         });
     } else {
@@ -105,19 +151,19 @@ const deleteUser = asyncHandler(async (req, res) => {
     }
 });
 
-// add addresses
+// @desc    Add address to user profile
+// @route   POST /api/users/:id/addresses
+// @access  Private
 const addAddress = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
+    
     if (!user) {
         res.status(404);
         throw new Error("User not found");
     }
 
-    //only allow user to modify their own addresses or admin
-    if (
-        user._id.toString() !== req.user._id.toString() &&
-        req.user.role !== "admin"
-    ) {
+    // Only allow user to modify their own addresses or admin
+    if (req.user._id.toString() !== user._id.toString() && req.user.role !== "admin") {
         res.status(403);
         throw new Error("Not authorized to modify this user's addresses");
     }
@@ -129,32 +175,27 @@ const addAddress = asyncHandler(async (req, res) => {
         throw new Error("All address fields are required");
     }
 
-    //if this is the first address, set as default
-    if (user.addresses.length === 0) {
-        user.addresses.push({
-            street,
-            city,
-            country,
-            postalCode,
-            isDefault: true,
-        });
-    } else {
-        // if setting this as default, make other addresses non-default
-        if (isDefault) {
-            user.addresses.forEach((addr) => {
-                addr.isDefault = false;
-            });
-        }
-        
-        user.addresses.push({
-            street,
-            city,
-            country,
-            postalCode,
-            isDefault: isDefault || false,
+    const newAddress = {
+        street,
+        city,
+        country,
+        postalCode,
+        isDefault: isDefault || false,
+    };
+
+    // If this is set as default, make other addresses non-default
+    if (newAddress.isDefault) {
+        user.addresses.forEach((addr) => {
+            addr.isDefault = false;
         });
     }
+    
+    // If this is the first address, set as default
+    if (user.addresses.length === 0) {
+        newAddress.isDefault = true;
+    }
 
+    user.addresses.push(newAddress);
     await user.save();
 
     res.json({
@@ -164,7 +205,9 @@ const addAddress = asyncHandler(async (req, res) => {
     });
 });
 
-//update address
+// @desc    Update user address
+// @route   PUT /api/users/:id/addresses/:addressId
+// @access  Private
 const updateAddress = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
 
@@ -173,11 +216,8 @@ const updateAddress = asyncHandler(async (req, res) => {
         throw new Error("User not found");
     }
 
-    //Only allow user to modify their own addresses or admin
-    if (
-        user._id.toString() !== req.user._id.toString() &&
-        req.user.role !== "admin"
-    ) {
+    // Only allow user to modify their own addresses or admin
+    if (req.user._id.toString() !== user._id.toString() && req.user.role !== "admin") {
         res.status(403);
         throw new Error("Not authorized to modify this user's addresses");
     }
@@ -196,7 +236,7 @@ const updateAddress = asyncHandler(async (req, res) => {
     if (country) address.country = country;
     if (postalCode) address.postalCode = postalCode;
 
-    // if this is set as default, make other addresses non-default
+    // If this is set as default, make other addresses non-default
     if (isDefault) {
         user.addresses.forEach((addr) => {
             addr.isDefault = false;
@@ -213,20 +253,19 @@ const updateAddress = asyncHandler(async (req, res) => {
     });
 });
 
-//delete address
+// @desc    Delete user address
+// @route   DELETE /api/users/:id/addresses/:addressId
+// @access  Private
 const deleteAddress = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (!user) {
         res.status(404);
         throw new Error("User not found");
-     }
+    }
 
-// Only allow user to modify their own addresses or admin
-    if (
-        user._id.toString() !== req.user._id.toString() &&
-        req.user.role !== "admin"
-    ) {
+    // Only allow user to modify their own addresses or admin
+    if (req.user._id.toString() !== user._id.toString() && req.user.role !== "admin") {
         res.status(403);
         throw new Error("Not authorized to modify this user's addresses");
     }
@@ -238,13 +277,14 @@ const deleteAddress = asyncHandler(async (req, res) => {
         throw new Error("Address not found");
     }
 
-   // if deleting default address, make the first remaining address default
+    // If deleting default address, make the first remaining address default
     const wasDefault = address.isDefault;
     user.addresses.pull(req.params.addressId);
     
     if (wasDefault && user.addresses.length > 0) {
         user.addresses[0].isDefault = true;
     }
+    
     await user.save();
 
     res.json({
@@ -254,4 +294,13 @@ const deleteAddress = asyncHandler(async (req, res) => {
     });
 });
 
-export { getUsers, createUser, getUsersById, updateUser, deleteUser, addAddress, updateAddress, deleteAddress };
+export { 
+    getUsers, 
+    createUser, 
+    getUsersById, 
+    updateUser, 
+    deleteUser, 
+    addAddress, 
+    updateAddress, 
+    deleteAddress 
+};

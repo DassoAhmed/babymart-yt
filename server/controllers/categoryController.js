@@ -22,12 +22,12 @@ const getCategories = asyncHandler(async (req, res) => {
     }
     const skip = (page - 1) * perPage;
     const total = categories.countDocuments({});
-    const sortValue = sortOrder === "asc" ? 1 : -1;
+    const sortValue = sortOrder === "asc" ? 1 : -1;// 1 for ascending, -1 for descending
 
     const categories = await Category.find({})
         .skip(skip)
         .limit(perPage)
-        .sort({ name: sortValue });
+        .sort({ createdAt: sortValue }); // sort by createdAt
 
         const totalPages = Math.ceil(total / perPage);
 
@@ -69,10 +69,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
     const category = await Category.findById(req.params.id);
 
     if (category) {
-        res.json({
-            success: true,
-            category
-        });
+        res.json(category);
     } else {
         res.status(404);
         throw new Error("Category not found");
@@ -88,7 +85,7 @@ const createCategory = asyncHandler(async (req, res) => {
     //validate inputs
     if (!name || typeof name !== "string") {
         res.status(400);
-        throw new Error("Invalid name");
+        throw new Error("Category name is required and must be a string");
     }
 
     // Check if category exists
@@ -120,12 +117,13 @@ const createCategory = asyncHandler(async (req, res) => {
         image: imageUrl,
         categoryType
     });
-
-    res.status(201).json({
-        success: true,
-        message: "Category created successfully",
-        category
-    });
+    // Response
+    if (category) {
+    res.status(201).json(category);
+} else {
+    res.status(400);
+    throw new Error("Invalid category data");
+    }
 });
 
 // @desc    Update a category

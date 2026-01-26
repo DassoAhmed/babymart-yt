@@ -1,83 +1,45 @@
 import mongoose from "mongoose";
 
-const productSchema = mongoose.Schema(
-    {
-        name: {
-            type: String,
-            required: true,
-            unique: true,   
-        },
-        description: {
-            type: String,
-            required: true,
-        },
-        price: {
-            type: Number,
-            required: true,
-            default: 0,
-        },
-        discountPercentage: {
-            type: Number,
-            default: 0,
-            min: 0,
-            max: 100,
-        },
-        stock:{
-            type: Number,
-            default: 0,
-            min: 0,
-        },
-        rating: [
-            {
-                userId:{
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "User",
-                    required: true,
-                },
-                rating: {
-                type: Number,
-                required: true,
-                min: 1,
-                max: 5,
-            },
-            createdAt: {
-                type: Date,
-                default: Date.now,
-            },
-        },
-    ],
-        averageRAting: {
-            type: Number,
-            default: 0,
-        },
-        images: 
-            {
-                type: String,
-                // required: true,
-            },
-        Category: {
-            type: mongoose.Schema.Types.ObjectId,
-            required: true,
-            ref: "Category",
-        },
-        brand: {
-            type: mongoose.Schema.Types.ObjectId,
-            required: true,
-            ref: "Brand",
-        },
+const productSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: [true, "Product name is required"],
+        trim: true
     },
-    {
-        timestamps: true,
+    description: {
+        type: String,
+        required: [true, "Product description is required"]
+    },
+    price: {
+        type: Number,
+        required: [true, "Product price is required"],
+        min: [0, "Price cannot be negative"]
+    },
+    Category: {  // Note: uppercase C
+        type: String,
+        required: [true, "Product category is required"]
+    },
+    brand: {
+        type: String,
+        required: [true, "Product brand is required"]
+    },
+    image: {
+        type: String,
+        default: ""
+    },
+    discountPercentage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+    },
+    stock: {
+        type: Number,
+        default: 0,
+        min: 0
     }
-);
-
-// calculate average rating before saving
-productSchema.pre("save", function (next) {
-    if (this.rating && this.rating.length > 0) {
-        const total = this.rating.reduce((acc, curr) => acc + curr.rating, 0);
-        this.averageRating = total / this.rating.length;
-    } 
-    next();
+}, {
+    timestamps: true
 });
 
 const Product = mongoose.model("Product", productSchema);
