@@ -1,3 +1,4 @@
+import { json } from "express";
 import Cart from "../models/cartModel.js";
 import order from "../models/OrderModel.js";
 
@@ -10,56 +11,55 @@ export const createOrderFromCart = async (req, res) => {
         throw new Error("Cart Items are required")
     }
 
-    try {
-        const userId = req.user._id;
-
-        const cart = await Cart.findOne({ user: userId }).populate('items.product');
-        
-        if (!cart || cart.items.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Cart is empty"
-            });
-        }
-
-        const totalAmount = cart.items.reduce((total, item) => {
-            return total + (item.product.price * item.quantity);
-        }, 0);
-
-        const orderData = {
-            user: userId,
-            items: cart.items.map(item => ({
-                product: item.product._id,
-                name: item.product.name,
-                quantity: item.quantity,
-                price: item.product.price
-            })),
-            shippingAddress: req.body.shippingAddress || req.user.shippingAddress,
-            totalAmount,
-            paymentMethod: req.body.paymentMethod || 'COD'
-        };
-
-        const order = await Order.create(orderData);
-
-        await Cart.findOneAndUpdate(
-            { user: userId },
-            { $set: { items: [] } }
-        );
-
-        res.status(201).json({
-            success: true,
-            message: "Order created successfully",
-            data: order
-        });
-
-    } catch (error) {
-        console.error("Create order error:", error);
-        res.status(500).json({
-            success: false,
-            message: error.message || "Server error"
-        });
+    //validate shipping address
+    if(
+        !shippingAddress ||
+        !shippingAddress.street ||
+        !shippingAddress.city ||
+        !shippingAddress.country ||
+        !shippingAddress.postalCode
+    ) {
+        res.status(400);
+        throw new Error(
+            "Shipping address is required with all fields (street, city, country, postalCode)");
     }
-};
+
+    // Validate  each item structure
+    const validItems = items.map((item) => {
+        if (!item._id || !item.name || !item.price || !item.quantity) {
+            res.status(400);
+            throw new Error("Invalid item structure")
+        }
+        return {
+            productId: item._id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.image,
+        };
+    });
+
+    //calculate total 
+    const total = validItems.reduce((acc, item) => {
+        return acc + item.price * item.quantity;
+    }, 0);
+
+    // create order with pending status (will be updated to "paid" after successfull payment)
+             const order = await Order.create({
+                userId: req.user.id,
+                items: validItems,
+                total,
+                status: "pending",
+                shippingAddress,
+             });
+
+             res.status(201).json({
+                success: true, 
+                order,
+                message: "Order created successfully",
+             });
+
+};  
 
 export const getOrders = async (req, res) => {
     try {
@@ -249,9 +249,21 @@ export const getAllOrdersAdmin = async (req, res) => {
 };
 
 export const updateOrderStatus = async (req, res) => {
-    try {
-        const { status } = req.body;
+    console.log("Order status Updated -  Request body:", req.body);
+    console.log("Order status Updated - Body type", typeof req.body);
 
+    if(!req.body){
+        return res.status(400),json({
+            success: false,
+            message: "Request body is missing",
+        });
+    }
+
+
+    try {
+        const { status, paymentIntendedId, stripeSessionId } = req.body;
+          
+        // validate status
         if (!status || !['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
             return res.status(400).json({
                 success: false,
@@ -267,9 +279,52 @@ export const updateOrderStatus = async (req, res) => {
                 message: "Order not found"
             });
         }
+      // check authorization based onorder status and user role
+      if(req.user){
+        const isOwner = order.userId.toString() === req.user._id.toString();
+        const isAdmin = req.user.role === "admin";
+        const isPending = order.status === "pending";
+        
+        // if user is not admin and (not owner or order is pending), deny access
+        if(!isAdmin && (!isOwner || isPending)){
+            res.status(403);
+            throw new Error(
+                isPending
+                ? "Not authorized to update this order"
+                : " Order status can only be updated by admin after payment"
+            );
+        }
+      }
+
+      //prepare update object
+      const updateData ={
+        status,
+        updatedAt: new Date(),
+      };
+
+      //if marking as paid, store payment information and timestamp
+      if (status === "paid"){
+        if(paymentIntendedId){
+            updateData.paymentIntendedId = paymentIntendedId;
+        }
+        if(stripeSessionId){
+            updateData.stripeSessionId = stripeSessionId;
+        }
+        updateData.paidAt = new Date();
+      }
+
+      // use findbyIdAndUpdate to avoid full document validation
+      const updatedOrder = await Order.findByIdAndDelete(
+        req.param.id,
+        updateData,
+        {
+            new: true,
+            runValidators: false, // disable validation to avoid shipping address issues
+        }
+      );
 
         order.status = status;
-        
+  
         order.statusHistory.push({
             status,
             updatedBy: req.user._id,
@@ -300,6 +355,27 @@ export const updateOrderStatus = async (req, res) => {
 };
 
 export const deleteOrder = async (req, res) => {
+    const order = await Order.findById(req.param.id);
+
+    //validate order
+    if(!order){
+        res.status(404);
+        throw new Error("Order not found");
+    }
+    // check if user owns order or admin
+    if(
+        req.user.role !== "admin"
+    ){
+        res.status(403);
+        throw new Error("Not Authorized to delete this order");
+    }
+        await Order.findByIdAndDelete(req.params.id);
+        
+        res.status(200).json({
+            success: true,
+            message: "Order deleted successfully"
+        });
+
     try {
         const order = await Order.findById(req.params.id);
         
@@ -317,13 +393,8 @@ export const deleteOrder = async (req, res) => {
             });
         }
 
-        await Order.findByIdAndDelete(req.params.id);
 
-        res.status(200).json({
-            success: true,
-            message: "Order deleted successfully"
-        });
-
+        
     } catch (error) {
         console.error("Delete order error:", error);
         if (error.kind === 'ObjectId') {
