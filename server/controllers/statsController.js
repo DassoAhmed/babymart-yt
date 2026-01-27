@@ -95,9 +95,4 @@ export const getStats = async (req, res) => {
             value: brand.count,
         })),
       });
-    }
-
-    
-export  {
-    getStats
-};
+    };

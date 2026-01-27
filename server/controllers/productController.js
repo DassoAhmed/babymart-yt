@@ -1,5 +1,6 @@
 import asyncHandler from "express-async-handler";
-import Product from "../models/ProductModel";
+import Product from "../models/ProductModel.js";
+
 // Create product controller
 const createProduct = asyncHandler(async (req, res) => {
     const {

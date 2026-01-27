@@ -1,6 +1,7 @@
 import express from "express";
-import { getStats } from "../controllers/statsController.js";
 import { admin, protect } from "../middleware/authMiddleware.js";
+import { getStats } from "../controllers/statsController.js";
+
 
 const router = express.Router();
 

@@ -13,17 +13,20 @@ const router = express.Router();
 
 // Public routes (if any) - none in this case
 
-// Protected routes (user must be logged in)
-router.route("/").post(protect, createOrderFromCart); // Create order from cart
-router.route("/my-orders").get(protect, getOrders); // Get user's own orders
-
 // Admin only routes
-router.route("/admin/all").get(protect, admin, getAllOrdersAdmin); // Get all orders (admin)
+router.route("/admin").get(protect, admin, getAllOrdersAdmin); // Get all orders (admin)
+
+// Protected routes (user must be logged in)
+router.route("/").get(protect, getOrders)// Get user's own orders
+.post(protect, createOrderFromCart); // Create order from cart
 
 // Order by ID routes
 router.route("/:id")
     .get(protect, getOrderById) // Get specific order
-    .put(protect, admin, updateOrderStatus) // Update order status (admin)
     .delete(protect, admin, deleteOrder); // Delete order (admin)
+    
+    router.route("/:id/status").put(protect, admin, updateOrderStatus) // Update order status (admin)
 
+    router.route("/:id/webhook-status").put(protect, admin, updateOrderStatus) // Update order status (admin)
+    
 export default router;

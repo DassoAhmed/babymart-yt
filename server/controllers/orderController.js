@@ -2,6 +2,14 @@ import Cart from "../models/cartModel.js";
 import order from "../models/OrderModel.js";
 
 export const createOrderFromCart = async (req, res) => {
+    const { items, shippingAddress } = req.body;
+
+    //validate that items are provided
+    if(!items || !Array.isArray(items) || items.length === 0){
+        res.status(400);
+        throw new Error("Cart Items are required")
+    }
+
     try {
         const userId = req.user._id;
 
@@ -118,10 +126,31 @@ export const getOrderById = async (req, res) => {
 export const getAllOrdersAdmin = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
+        const perPage = parseInt(req.query.page) || 10;
+        const sortOrder = req.query.sortOrder === "desc" ? -1 : 1;
+        const status =req.query.status;
+        const paymentStatus = req.query.paymentStatus;
         const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
 
+        //build filter object
         const filter = {};
+        if(status && status !== "all"){
+            filter.status = status;
+        }
+        if (paymentStatus && paymentStatus !== "all"){
+            //map payment status  to actual status
+            if(paymentStatus === "paid"){
+                filter.status = { $in: ["paid", "complete"]};
+            }else if ( paymentStatus === "pending" ){
+                filter.status = "pending";
+            }else if (paymentStatus === "failed") {
+                filter.status = "cancelled";
+            }
+        }
+
+        const skip = (page - 1) * perPage;
+
+
         if (req.query.status) {
             filter.status = req.query.status;
         }
@@ -133,12 +162,66 @@ export const getAllOrdersAdmin = async (req, res) => {
         }
 
         const orders = await Order.find(filter)
-            .populate('user', 'name email')
-            .sort({ createdAt: -1 })
+            .populate('userId', 'name email')
+            .populate("item.productId", "name price image")
+            .sort({ createdAt: sortOrder })
             .skip(skip)
-            .limit(limit);
+            .limit(perPage);
 
+            //total value properties
         const total = await Order.countDocuments(filter);
+        const totalPages = Math.ceil(total / perPage);
+
+        // Transform data to match frontent expect
+        const transformedOrders = order.map((order) =>({
+            _id: order._id,
+            orderId: `ORD-${order._id.toString().slice(-6).toUpperCase()}`, // Generate readable order ID
+            user: {
+                _id: order.userId._id,
+                name: order.userId.name || 'Unknown',
+                email: order.userId.email || 'No email',
+                phone: order.userId.phone || 'No phone'
+            },
+            items: order.items.map(item => ({
+                product:{
+                    _Id: item.productId._id,
+                    name: item.productId.name || item.name || 'Product not found',
+                    price: item.productId || item.productId.price || 0,
+                    image: item.productId.image || '/images/default-product.png',
+                    
+                },
+                quantity: item.quantity,
+                price: item.productId,
+                total: (item.price || item.product?.price || 0) * item.quantity
+            })),
+            shippingAddress: order.shippingAddress || {},
+            totalAmount: order.totalAmount,
+            status: order.status,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: 
+            order.status === 'paid' || order.status === 'complete' 
+            ? "paid"
+            : order.status === 'cancelled'
+            ? "failed" 
+            : "pending",
+            shippingAddress: order.shippingAddress || {
+                street: "N/A",
+                city: "N/A",
+                state: "N/A",
+                zipcode: "N/A",
+                country: "N/A",
+            },
+            createdAt: order.createdAt,
+            updatedAt: order.updatedAt,
+            // Calculate item count and subtotals for frontend
+            itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+            subtotal: order.items.reduce((sum, item) => 
+                sum + ((item.price || item.product?.price || 0) * item.quantity), 0),
+            tax: order.tax || 0,
+            shippingFee: order.shippingFee || 0,
+            discount: order.discount || 0
+        }));
+          
 
         const summary = {
             totalOrders: total,
@@ -150,13 +233,10 @@ export const getAllOrdersAdmin = async (req, res) => {
         };
 
         res.status(200).json({
-            success: true,
-            count: orders.length,
-            total,
-            totalPages: Math.ceil(total / limit),
-            currentPage: page,
-            summary,
-            data: orders
+           orders: transformedOrders,
+           total,
+           totalPages,
+           currentPage: page,
         });
 
     } catch (error) {

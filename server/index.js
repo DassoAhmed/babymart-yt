@@ -13,7 +13,8 @@ import productRoutes from "./routes/productRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import brandRoutes from "./routes/brandRoutes.js";
 import bannerRoutes from "./routes/bannerRoutes.js";
-import statsRoutes from "./routes/statsRoutes";
+import statsRoutes from "./routes/statsRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js"
 
 
 // Load env vars
@@ -80,11 +81,11 @@ app.use("/api/stats", statsRoutes);
 // orderRoutes
 app.use("/api/orders", orderRoutes);
 // cartRoutes
-app.use("/api/cart", cartRoutes);
+// app.use("/api/cart", cartRoutes);
 // analyticsRoutes
-app.use("/api/analytics", analyticsRoutes);
+// app.use("/api/analytics", analyticsRoutes);
 // paymentRoutes
-app.use("/api/payments", paymentRoutes);
+// app.use("/api/payments", paymentRoutes);
 
 // API Documentation
 app.use("/api-docs", 

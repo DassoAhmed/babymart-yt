@@ -40,7 +40,7 @@ export const createBanner = async (req, res) => {
     }
 };
 
-export const getAllBanners = async (req, res) => {
+export const getBanners = async (req, res) => {
     try {
         const banners = await Banner.find().sort({ createdAt: -1 });
 
@@ -178,7 +178,7 @@ export const deleteBanner = async (req, res) => {
 
 export default {
     createBanner,
-    getAllBanners,
+    getBanners,
     getBannerById,
     updateBanner,
     deleteBanner
